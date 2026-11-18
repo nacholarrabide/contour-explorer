@@ -1,0 +1,127 @@
+# Prompt para Cursor: integrar Contour Explorer en AngioSeg
+
+Quiero integrar el prototipo Contour Explorer en el proyecto AngioSeg.
+El destino previsto en la conversación es el dominio existente, mediante la ruta:
+
+https://angioseg.arroyoseco.tech/contour/
+
+Redirigí /contour a /contour/. Si conservás /contour.html o
+/contour/contour.html como alias, redirigilos a la ruta canónica sin saltarse
+la autenticación. No crear un subdominio ni un alojamiento nuevo. El dominio ya llega a esta máquina mediante un reverse proxy;
+identificá primero la configuración ACTIVA, sin asumir que el nginx del repo sea
+el que está en uso.
+
+El proyecto destino está confirmado: AngioSeg, en /home/nacho/devel/angioseg.
+Inspeccioná su arquitectura y despliegue activos antes de elegir cómo servir el HTML.
+
+## Fuente y alcance
+
+La fuente canónica es /home/nacho/devel/contour-explorer/contour.html,
+repositorio git@github.com:nacholarrabide/contour-explorer.git.
+Publicá esta instantánea de la primera versión de pruebas:
+
+- Modelo: contour-cup-0.4.
+- Commit fuente: registrar el commit de main del repositorio independiente antes de copiar.
+- Archivo: contour.html.
+- SHA-256: fbcd605557249277ec44425e10665c3b7ad8d99ff733d189f0fd6bdce9036d5f.
+
+Verificá el checksum antes y después de copiarlo. Si el archivo de trabajo ya
+cambió, extraé esta versión desde Git a una carpeta temporal, sin hacer checkout,
+reset ni sobrescribir cambios locales. No reconstruyas ni reemplaces el modelo.
+Si esta instantánea no está disponible, informá el bloqueo y pedime su ubicación.
+
+Es un único HTML con CSS/JS/SVG embebidos, sin backend de cálculo, dependencias,
+GPU, base de datos o peticiones externas para funcionar. Tiene presets visuales,
+comparaciones, banco de experimentos y exportación/importación local JSON/SVG.
+La apariencia usa como referencia los estilos locales de AngioSeg: fondo #0B1220,
+paneles #0F1A2E y #111E36, texto #EAF2FF, secundario #B9C7E6 y acento #16C6D2,
+con tipografía ui-sans-serif/system-ui y tarjetas redondeadas de 14 px. Confirmá
+los tokens del proyecto destino y mantené coherencia sin añadir fuentes remotas.
+Conservá el botón de tema AngioSeg / Stryker-inspired y su preferencia local.
+Verificá la ventana Simulation fija durante el scroll en escritorio, resultados
+de solo lectura debajo y secciones avanzadas inicialmente plegadas. En móvil
+la disposición sigue el flujo normal. Verificá ambos temas, contraste, leyenda y SVG exportado; el cambio de tema no
+debe alterar escenarios ni resultados. Las fuentes corporativas tienen alternativas
+locales y no requieren descargas externas.
+Conservá la interfaz en inglés y todas las advertencias de modelo sintético no
+validado. No modificar las ecuaciones durante este despliegue. La versión actual es
+contour-cup-0.4: referencia cuadrática coherente para contacto; la elongación
+excesiva aún no está resuelta. No presentar esta revisión como validación física.
+
+El código fuente se mantiene en su repo. En el proyecto destino, incorporá un procedimiento
+reproducible para copiar/publicar una versión explícita y verificar su checksum;
+no conviertas dos copias editables en fuentes divergentes. Serví exclusivamente
+el archivo necesario, nunca el checkout completo ni carpetas padre.
+
+## Acceso
+
+Para este piloto de equipo, prepará la ruta con autenticación existente del proyecto y una
+lista explícita de usuarios autorizados o un permiso equivalente. Un usuario
+registrado no implica automáticamente permiso para este prototipo. Reutilizá la
+sesión existente, sin crear un segundo sistema de contraseñas. Si faltan los
+usuarios autorizados, completá y probá el mecanismo y pedime sus identificadores
+antes de habilitar acceso real; no inventes destinatarios ni abras la ruta como
+alternativa. El acceso se debe verificar en el servidor ANTES de entregar el HTML,
+no solo mediante ocultación en la interfaz o JavaScript.
+
+Si el sistema no dispone de esa autorización, explicá la alternativa más pequeña
+compatible con el despliegue existente. No uses una URL difícil de adivinar como
+control de acceso. Evitá cachear la respuesta protegida públicamente; comprobá
+que proxy, cookies, redirecciones y políticas de seguridad no anulan la protección.
+
+## Procedimiento
+
+1. Leé AGENTS.md y las instrucciones del proyecto destino. Identificá servicios,
+   puerto local, mecanismo de despliegue, proxy activo y autenticación actual.
+   No imprimas credenciales ni tokens. Inspeccioná cambios locales antes de editar.
+2. Proponé y ejecutá un cambio pequeño, reversible y registrado en el plan/etapa
+   que exija el repositorio. Si FastAPI ya sirve el sitio, una ruta que entregue
+   un FileResponse protegido puede ser suficiente; verificá el middleware real.
+   Organizá la copia desplegable en una subcarpeta contour de los recursos del
+   proyecto, pero fuera de cualquier montaje estático público si la ruta requiere
+   sesión. Comprobá precedencia frente al fallback de la SPA: /contour/ debe
+   devolver el explorer, no el index de AngioSeg. No depender del servidor local
+   temporal del puerto 8770. Usá el servicio persistente existente.
+   Agregá un enlace “Contour Explorer · Experimental” en la navegación del equipo
+   autorizado. Abrir el enlace directamente y recargar /contour/ deben funcionar;
+   tras iniciar sesión, volver a esa ruta con un destino de redirección validado.
+3. Revisá CSP para el HTML autocontenido, sin relajar globalmente las protecciones
+   del proyecto. No añadir servicios públicos de desarrollo ni exponer nuevos
+   puertos a Internet. No tocar inferencia, GPU, datasets ni módulos del motor.
+4. Prepará rollback del archivo y configuración. Ejecutá las pruebas exigidas por
+   el proyecto y pruebas específicas de la ruta: anónimo sin HTML, usuario sin
+   permiso denegado, usuario autorizado con HTML. Probá también los alias para
+   evitar rutas alternativas sin protección.
+5. Mostrame el cambio concreto, pruebas y procedimiento de activación antes de
+   modificar el servicio activo. Con mi aprobación, desplegá usando el mecanismo
+   existente y recargá/reiniciá solo el servicio necesario. Verificá desde el
+   dominio externo tanto acceso autorizado como denegado; una prueba localhost
+   sola no confirma el despliegue externo.
+6. En navegador, verificá este orden exacto de tarjetas:
+   - Near-unit aspect ratio: C9; ancho 8.4, altura 8, ecuador 4, cuello 4.5 mm.
+   - Ovoid sac: C7; ancho 6.4, altura 7.8, ecuador 3.9, cuello 4 mm.
+   - Tall sac: C5; ancho 4.2, altura 6.8, ecuador 3.4, cuello 2.2 mm.
+   Los presets no activan overlay y tienen el ecuador a media altura. Probá sliders,
+   comparación manual con otra talla, adaptación de ambas copas, barridos, JSON
+   y SVG. La copa comparada debe ser discontinua en todo su perfil, incluso fuera
+   del saco, y ambas deben mostrar “Pole C” con su talla. No ocultar conflictos
+   para aparentar un ajuste. Confirmá que los experimentos
+   funcionan en el navegador sin enviar sus datos al servidor.
+7. Verificá que el service worker y las cachés no sirvan otra versión ni guarden
+   el HTML protegido para usuarios sin acceso. Documentá cómo actualizar la copia
+   desde un nuevo commit explícito y cómo comprobar la versión que se sirve.
+8. Comprobá que login, interfaz y salud del proyecto siguen funcionando. Registrá
+   versión desplegada, checksum, URL, política de acceso, pruebas y rollback.
+   Hacé commit/push según las instrucciones del repo destino. Si una comprobación
+   externa no es posible, indicá qué quedó sin verificar; no declares éxito total.
+
+## Datos
+
+No hay autorización para publicar casos clínicos. Los aneurismas y dispositivos
+reales segmentados se incorporarán más adelante en un flujo privado, fuera de
+ambos repositorios públicos y de las carpetas servidas. No cargar ni buscar esos
+datos para este despliegue. Los presets actuales son completamente sintéticos.
+
+Resultado esperado: una instalación reproducible, accesible al equipo autorizado
+mediante el dominio indicado, con el resto del proyecto intacto y sin presentar el
+explorer como herramienta clínicamente validada.
