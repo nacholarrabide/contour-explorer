@@ -26,10 +26,21 @@
 .simulation-column .view{margin-bottom:12px}
 .simulation-column #diagram{height:min(46vh,460px);min-height:220px;width:100%}
 .simulation-column .results{display:block}
+.views-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:stretch;padding:0 4px}
+.view-pane{min-width:0;display:flex;flex-direction:column;gap:6px}
+.view-pane-label{font-size:12px;color:var(--muted);padding:0 6px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+#diagram3dHost{position:relative;flex:1;min-height:220px;height:min(46vh,460px);border-radius:10px;overflow:hidden;background:#0f1a2e;border:1px solid var(--line)}
+#diagram3dHost canvas{display:block;width:100%!important;height:100%!important}
+#reset3dView{padding:4px 8px;font-size:12px}
+[data-theme="stryker"] #diagram3dHost{background:#ffffff}
 #metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 16px}
 #metrics>p{grid-column:1/-1}.metric strong{font-size:21px}.metric:first-of-type{padding-top:14px}
-@media(max-width:700px){.simulation-column{position:static;max-height:none;overflow:visible;order:0}.simulation-column #diagram{height:auto;min-height:0}#metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:900px){.views-row{grid-template-columns:1fr}}
+@media(max-width:700px){.simulation-column{position:static;max-height:none;overflow:visible;order:0}.simulation-column #diagram{height:auto;min-height:0}#diagram3dHost{height:min(50vh,420px)}#metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
+<script type="importmap">
+{"imports":{"three":"./vendor/three.module.min.js"}}
+</script>
 </head>
 <body>
 <header><div><div class="eyebrow">Geometry lab · v0.4</div><h1>Contour Explorer</h1></div><div class="header-actions"><button id="themeToggle" type="button" aria-pressed="false" title="Switch appearance only; model parameters stay unchanged">Theme: AngioSeg</button><span class="tag">Synthetic model · uncalibrated</span></div></header>
@@ -58,10 +69,15 @@
 <div class="toolbar" aria-label="Twist examples"><button type="button" data-twist="0.15">n = 0.15</button><button type="button" data-twist="0.3">n = 0.30</button><button type="button" data-twist="0.5">n = 0.50 · baseline</button><button type="button" data-twist="0.75">n = 0.75</button></div><p class="small">Try lower twist to explore reduced elongation in this model. Higher angles do not necessarily shorten the cup. Each change defines a new reference wire budget; it is not deformation of the same fixed wire. Free depth / diameter also controls elongation. Wall departure may jump between solutions.</p>
 <div class="control"><label for="minPoleRadius">Minimum pole radius <output id="minPoleRadiusOut"></output></label><input id="minPoleRadius" type="range" min="0.02" max="0.5" step="0.01" value="0.1"><p class="small">In wall-contact mode, limits curvature near the pole in addition to a horizontal tangent. A geometric assumption, not a physical force.</p></div><p class="small">Synthetic settings shared by all sizes, not measured Contour properties. An idealised wire length is conserved; forces and two-layer mechanics are not modelled.</p></details></section>
 </aside>
-<div class="simulation-column"><section class="panel view" aria-label="Simulation"><div class="view-head"><h2>Simulation</h2><span class="small">Equal axis scale</span></div>
+<div class="simulation-column"><section class="panel view" aria-label="Simulation"><div class="view-head"><h2>Simulation</h2><span class="small">2D section · 3D solid of revolution</span></div>
 <div class="legend"><span><i class="key wall"></i>Sac</span><span><i class="key"></i>Free segment</span><span><i class="key" style="border-color:#f0b45d"></i>Wall contact</span><span><i class="key compare"></i>Comparison</span><span><i class="key" style="border-color:#ff8585"></i>Undersized / geometric conflict</span></div>
-<svg id="diagram" viewBox="0 0 600 540" role="img" aria-labelledby="diagramTitle diagramDesc"></svg>
-<p class="small" style="padding:0 10px">Idealised outer profile. The proximal point is the geometric pole, not the marker. Amber: wall contact; circles: departure. Red: the entire undersized cup and its rim gaps, or segments outside the sac / below the neck plane. Horizontal dashed lines: rim-to-wall gaps.</p>
+<div class="views-row">
+<div class="view-pane"><div class="view-pane-label"><span>2D · longitudinal section</span><span class="small">Equal axis scale</span></div>
+<svg id="diagram" viewBox="0 0 600 540" role="img" aria-labelledby="diagramTitle diagramDesc"></svg></div>
+<div class="view-pane"><div class="view-pane-label"><span>3D · solids of revolution</span><button type="button" id="reset3dView" title="Reset camera">Reset view</button></div>
+<div id="diagram3dHost" role="img" aria-label="Three-dimensional solids of revolution of the sac and cup"></div></div>
+</div>
+<p class="small" style="padding:0 10px">Idealised outer profile. The proximal point is the geometric pole, not the marker. Amber: wall contact; circles: departure. Red: the entire undersized cup and its rim gaps, or segments outside the sac / below the neck plane. Horizontal dashed lines: rim-to-wall gaps. The 3D panel revolves the same meridional curves; drag to orbit, scroll to zoom. Synthetic model · uncalibrated.</p>
 </section>
 <aside class="panel results" aria-label="Results"><div><h2>Simulation results</h2><p class="small">Calculated outputs · read-only</p><div id="metrics"></div><div id="status" role="status" aria-live="polite"></div><div id="comparisonInfo" class="small"></div></div><div><h2 style="margin-top:20px">Published ranges</h2><p class="small">Sac width / neck width, in mm. Highlighted: both measurements within the published range.</p><div id="catalog" class="catalog"></div><p class="small">Matching catalogue ranges does not establish device fit.</p></div></aside></div>
 </div>
@@ -191,6 +207,31 @@ function readScenario(doc){
 
 // The meridional profile arc is not a braided wire trajectory.
 function profileArc(c){return 2*(c.arc??wireLength(c.R,c.h,0));}
+// Revolve a meridional polyline (r,z) about z into a triangle mesh (x,y,z).
+function sacMeridian(s,n=96){const pts=[];for(let i=0;i<=n;i++){const z=s.height*i/n;pts.push({r:radiusAt(z,s),z});}return pts;}
+function cupMeridian(c){return (c&&c.ok&&c.points)?c.points.map(p=>({r:p.r,z:p.z,contact:!!p.contact,outside:!!p.outside})):[];}
+function revolveProfile(meridian,nTheta=48){
+ if(!Array.isArray(meridian)||meridian.length<2||nTheta<3)throw Error('Invalid revolution profile.');
+ const positions=[],colors=[],indices=[],n=meridian.length;
+ for(let i=0;i<n;i++){
+  const p=meridian[i],r=Math.max(0,p.r),z=p.z;
+  let cr=0.5,cg=0.58,cb=0.72;
+  if(p.undersized||p.outside){cr=1;cg=0.52;cb=0.52;}
+  else if(p.contact){cr=0.94;cg=0.71;cb=0.36;}
+  else if(p.compare){cr=0.65;cg=0.71;cb=0.99;}
+  else if(p.free){cr=0.09;cg=0.78;cb=0.82;}
+  for(let j=0;j<nTheta;j++){
+   const th=2*Math.PI*j/nTheta;
+   positions.push(r*Math.cos(th),r*Math.sin(th),z);
+   colors.push(cr,cg,cb);
+  }
+ }
+ for(let i=0;i<n-1;i++)for(let j=0;j<nTheta;j++){
+  const j2=(j+1)%nTheta,a=i*nTheta+j,b=i*nTheta+j2,c=(i+1)*nTheta+j,d=(i+1)*nTheta+j2;
+  indices.push(a,c,b,b,c,d);
+ }
+ return {positions:Float32Array.from(positions),colors:Float32Array.from(colors),indices:Uint32Array.from(indices),ringCount:n,nTheta};
+}
 const PRESETS={default:{},wide:{width:9,height:4,equator:2,neck:7,size:11,rim:2},tall:{width:5,height:11,equator:5,neck:3,size:7,rim:5},narrow:{width:7,height:8,equator:4,neck:2,size:9,rim:4},wideNeck:{width:7,height:6,equator:3,neck:7,size:9,rim:3},high:{width:7,height:10,equator:8,neck:4,size:9,rim:8}};
 function sweepRange(s,key){return {width:[2,12],equator:[.2,s.height-.2],neck:[1,s.width],ratio:[.15,.65],turns:[0,1.5],minPoleRadius:[.02,.5],contactMin:[0,100]}[key];}
 function experimentResult(s,profile){const r=solveCup({...s,profile},s.size);return {profile,status:!r.ok?'failed':r.reference?'reference':'solved',depth:r.h??null,pole:r.pole??null,departure:r.detach??null,wallDescent:r.contactFraction??null,poleRadius:r.poleRadius??null,referenceReason:r.referenceReason??r.reason??null};}
@@ -218,7 +259,14 @@ function draw(){const cups=[current,comparison].filter(c=>c&&c.ok),minZ=Math.min
 const tick=(maxZ-minZ)>16?2:1;for(let z=Math.ceil(minZ/tick)*tick;z<=maxZ;z+=tick){svg+=line(65,Y(z),535,Y(z),'#253249')+label(55,Y(z)+4,String(z),'#b9c7e6','end');}svg+=label(30,20,'z (mm)');for(let x=Math.ceil(-half);x<=half;x+=2){svg+=line(X(x),Y(minZ),X(x),Y(minZ)+4,'#b9c7e6')+label(X(x),Y(minZ)+19,String(x),'#b9c7e6','middle');}svg+=label(535,Y(minZ)+36,'x (mm)','#b9c7e6','end');svg+=line(cx,Y(minZ),cx,Y(state.height),'#536480','3 5');
 let wall=[];for(let i=0;i<=240;i++){const z=state.height*i/240;wall.push([radiusAt(z,state),z]);}const path=pts=>pts.map((p,i)=>(i?'L':'M')+X(p[0]).toFixed(2)+','+Y(p[1]).toFixed(2)).join(' ');const outline=[...wall,...wall.slice().reverse().map(([r,z])=>[-r,z])];svg+='<path d="'+path(outline)+' Z" fill="#111e36" stroke="#7f92b8" stroke-width="2"/>';svg+=line(65,Y(0),535,Y(0),'#c7a87b','6 4')+label(75,Y(0)-7,'Neck · '+fmt(state.neck)+' mm','#c7a87b');svg+=line(X(-state.width/2)-10,Y(state.equator),X(state.width/2)+10,Y(state.equator),'#7f92b8','4 5')+label(75,Y(state.equator)-7,'Equator · '+fmt(state.width)+' mm');
 for(const c of cups.slice().reverse()){const isCompare=c===comparison,color=c.undersized?'#ff8585':isCompare?'#a5b4fc':'#16c6d2',dash=isCompare?'7 5':'';for(const side of [-1,1]){svg+='<path d="'+path(c.points.map(p=>[side*p.r,p.z]))+'" fill="none" stroke="'+color+'" stroke-width="'+(isCompare?2:3)+'" stroke-dasharray="'+dash+'"/>';for(const [matches,stroke,width] of [[(a,b)=>a.contact&&b.contact,'#f0b45d',isCompare?2:4],[(a,b)=>a.outside||b.outside,'#ff8585',isCompare?2:3]]){let run=[],offset=0,travel=0;const flush=()=>{if(run.length>1)svg+='<path d="'+path(run)+'" fill="none" stroke="'+stroke+'" stroke-width="'+width+'" stroke-dasharray="'+dash+'" stroke-dashoffset="'+(-offset)+'"/>';run=[];};for(let i=1;i<c.points.length;i++){const a=c.points[i-1],b=c.points[i];if(matches(a,b)){if(!run.length){offset=travel;run.push([side*a.r,a.z]);}run.push([side*b.r,b.z]);}else flush();travel+=Math.hypot(b.r-a.r,b.z-a.z)*scale;}flush();}}if(c.rimGap>0){for(const side of [-1,1])svg+=line(X(side*c.R),Y(c.rim),X(side*(c.R+c.rimGap)),Y(c.rim),color,'3 3',2);if(!isCompare)svg+=label(cx,Y(c.rim)-10,'Gap per side: '+fmt(c.rimGap)+' mm',color,'middle');}if(!isCompare&&c.detach!==undefined){for(const side of [-1,1])svg+='<circle cx="'+X(side*c.detachRadius)+'" cy="'+Y(c.detach)+'" r="4" fill="white" stroke="#f0b45d" stroke-width="2"/>';svg+=label(X(c.detachRadius)+8,Y(c.detach)-9,'Departure','#f0b45d');}svg+='<circle cx="'+cx+'" cy="'+Y(c.pole)+'" r="4" fill="'+color+'"/>';svg+=label(cx+(isCompare?-10:10),Y(c.pole)+17,'Pole C'+c.size+(c.reference?' · reference':''),color,isCompare?'end':'start');}
-svg+=label(75,525,'Synthetic model · uncalibrated · not for clinical use');$('diagram').innerHTML=svg;applySvgTheme();}
+svg+=label(75,525,'Synthetic model · uncalibrated · not for clinical use');$('diagram').innerHTML=svg;applySvgTheme();
+if(window.ContourView3D&&window.ContourView3D.update)window.ContourView3D.update(getContour3dSnapshot());}
+function getContour3dSnapshot(){
+ const main=current&&current.ok?cupMeridian(current).map(p=>({...p,free:!p.contact&&!p.outside,undersized:!!current.undersized})):[];
+ const cmp=comparison&&comparison.ok?cupMeridian(comparison).map(p=>({...p,compare:true,free:!p.contact&&!p.outside,undersized:!!comparison.undersized||!!p.outside})):[];
+ return {appearance,state:{...state},sac:sacMeridian(state,96),cup:main,compare:cmp,bounds:{height:state.height,width:state.width,pole:current&&current.ok?current.pole:0}};
+}
+window.ContourGeometry={revolveProfile,sacMeridian,cupMeridian,getContour3dSnapshot};
 for(const k of Object.keys(DEFAULTS))$(k).addEventListener('input',()=>{state[k]=['mode','profile'].includes(k)?$(k).value:Number($(k).value);state.neck=Math.min(state.neck,state.width);state.equator=Math.min(state.equator,state.height-.2);state.rim=Math.min(state.rim,state.height-.2);$('message').textContent='';render();});
 $('braidAngle').oninput=()=>{state.turns=Math.min(1.5,turnsFromAngle(Number($('braidAngle').value),state.ratio,state.profile));render();};
 document.querySelectorAll('[data-twist]').forEach(button=>button.onclick=()=>{state.turns=Number(button.dataset.twist);render();});
@@ -311,9 +359,139 @@ function applyAppearance(){
  $('themeToggle').textContent=appearance==='stryker'?'Theme: Stryker-inspired':'Theme: AngioSeg';
  $('themeToggle').setAttribute('aria-pressed',String(appearance==='stryker'));
  applySvgTheme();
+ if(window.ContourView3D&&window.ContourView3D.setAppearance)window.ContourView3D.setAppearance(appearance);
 }
 $('themeToggle').onclick=()=>{appearance=appearance==='angioseg'?'stryker':'angioseg';try{localStorage.setItem('contour-appearance',appearance);}catch{}applyAppearance();};
 applyAppearance();
 
 render();
-</script></body></html>
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from './vendor/addons/controls/OrbitControls.js';
+
+const host=document.getElementById('diagram3dHost');
+const resetBtn=document.getElementById('reset3dView');
+if(host){
+ const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});
+ renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+ host.appendChild(renderer.domElement);
+ const scene=new THREE.Scene();
+ scene.up.set(0,0,1);
+ const camera=new THREE.PerspectiveCamera(42,1,0.05,500);
+ camera.up.set(0,0,1);
+ const controls=new OrbitControls(camera,renderer.domElement);
+ controls.enableDamping=true;
+ controls.dampingFactor=0.08;
+ controls.screenSpacePanning=true;
+ const hemi=new THREE.HemisphereLight(0xeaf2ff,0x1a2438,1.05);
+ const key=new THREE.DirectionalLight(0xffffff,0.85);
+ key.position.set(8,6,10);
+ scene.add(hemi,key);
+ const root=new THREE.Group();
+ scene.add(root);
+ let appearance='angioseg';
+ let fitted=false;
+
+ function themeColors(){
+  return appearance==='stryker'
+   ?{bg:0xffffff,sac:0xd8dad7,sacOpacity:0.35,grid:0xe3e5e1,amb:0xf5f5f3}
+   :{bg:0x0f1a2e,sac:0x7f92b8,sacOpacity:0.28,grid:0x253249,amb:0x0b1220};
+ }
+ function applyTheme(){
+  const t=themeColors();
+  scene.background=new THREE.Color(t.bg);
+  hemi.color.set(appearance==='stryker'?0xffffff:0xeaf2ff);
+  hemi.groundColor.set(appearance==='stryker'?0xd0d2ce:0x1a2438);
+  renderer.setClearColor(t.bg,1);
+ }
+
+ function meshFromRevolution(meridian,opts={}){
+  if(!meridian||meridian.length<2)return null;
+  const tagged=meridian.map(p=>({...p,...opts.tag}));
+  const meshData=window.ContourGeometry.revolveProfile(tagged,opts.nTheta||48);
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(meshData.positions,3));
+  geo.setAttribute('color',new THREE.BufferAttribute(meshData.colors,3));
+  geo.setIndex(new THREE.BufferAttribute(meshData.indices,1));
+  geo.computeVertexNormals();
+  const mat=new THREE.MeshStandardMaterial({
+   vertexColors:true,
+   roughness:0.55,
+   metalness:0.05,
+   transparent:!!opts.transparent,
+   opacity:opts.opacity??1,
+   side:THREE.DoubleSide,
+   depthWrite:opts.depthWrite!==false,
+   wireframe:!!opts.wireframe
+  });
+  return new THREE.Mesh(geo,mat);
+ }
+
+ function clearRoot(){while(root.children.length){const o=root.children.pop();if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();}}
+
+ function fitCamera(bounds){
+  const h=Math.max(2,bounds.height||6);
+  const w=Math.max(2,bounds.width||6);
+  const pole=Number.isFinite(bounds.pole)?bounds.pole:-1;
+  const midZ=(pole+h)/2;
+  const radius=Math.max(w,h)*0.85;
+  camera.position.set(radius*1.35,radius*1.05,midZ+h*0.15);
+  controls.target.set(0,0,midZ);
+  controls.update();
+  fitted=true;
+ }
+
+ function update(snap){
+  if(!snap)return;
+  appearance=snap.appearance||appearance;
+  applyTheme();
+  clearRoot();
+  const t=themeColors();
+  const sacPts=(snap.sac||[]).map(p=>({r:p.r,z:p.z}));
+  const sac=meshFromRevolution(sacPts,{transparent:true,opacity:t.sacOpacity,nTheta:56,depthWrite:false,tag:{}});
+  if(sac){
+   sac.material.vertexColors=false;
+   sac.material.color=new THREE.Color(t.sac);
+   root.add(sac);
+  }
+  const cup=meshFromRevolution(snap.cup,{nTheta:52});
+  if(cup)root.add(cup);
+  const cmp=meshFromRevolution(snap.compare,{nTheta:52,transparent:true,opacity:0.55,wireframe:true,tag:{compare:true}});
+  if(cmp)root.add(cmp);
+  const neck=new THREE.GridHelper(Math.max(snap.bounds.width*1.6,6),8,t.grid,t.grid);
+  neck.rotation.x=Math.PI/2;
+  neck.position.z=0;
+  root.add(neck);
+  if(!fitted)fitCamera(snap.bounds||{});
+ }
+
+ function setAppearance(next){
+  appearance=next;
+  applyTheme();
+  if(window.ContourGeometry)update(window.ContourGeometry.getContour3dSnapshot());
+ }
+
+ function resize(){
+  const w=Math.max(1,host.clientWidth),h=Math.max(1,host.clientHeight);
+  camera.aspect=w/h;camera.updateProjectionMatrix();
+  renderer.setSize(w,h,false);
+ }
+ const ro=new ResizeObserver(()=>resize());
+ ro.observe(host);
+ resize();
+ applyTheme();
+
+ function frame(){controls.update();renderer.render(scene,camera);requestAnimationFrame(frame);}
+ requestAnimationFrame(frame);
+
+ resetBtn?.addEventListener('click',()=>{
+  fitted=false;
+  if(window.ContourGeometry)update(window.ContourGeometry.getContour3dSnapshot());
+ });
+
+ window.ContourView3D={update,setAppearance,reset:()=>{fitted=false;if(window.ContourGeometry)update(window.ContourGeometry.getContour3dSnapshot());}};
+ if(window.ContourGeometry)update(window.ContourGeometry.getContour3dSnapshot());
+}
+</script>
+</body></html>
