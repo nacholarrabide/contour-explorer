@@ -2,7 +2,7 @@
 
 Standalone experimental explorer for the Contour braided cup device. Current model: `contour-cup-0.4`.
 
-Open `contour.html` directly, or run `python3 -m http.server 8765 --bind 127.0.0.1` and visit http://127.0.0.1:8765/contour.html. No build or runtime dependencies.
+Serve this directory with `python3 -m http.server 8765 --bind 127.0.0.1` and visit http://127.0.0.1:8765/contour.html (HTTP is required for the local Three.js modules). No build step. Vendored Three.js r170 lives under `vendor/` (MIT; see `vendor/README.md`). The Simulation panel shows a 2D meridional section beside a 3D solid-of-revolution view of the same synthetic geometry.
 
 Run geometry tests from this directory with `node tests/contour.test.cjs`.
 

@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const html = fs.readFileSync('contour.html', 'utf8');
 const source = html.match(/<script id="geometry">([\s\S]*?)<\/script>/)[1];
 const ctx = vm.createContext({});
-vm.runInContext(source + '\nthis.api={referenceContactLength,referenceBraidAngle,turnsFromAngle,radiusAt,wireLength,solveCup,validateState,catalogMatch,CATALOG,DEFAULTS,solveContact,contactGeometry,contactLengths,wallSlope,readScenario,PRESETS,sweepRange,experimentResult,QUICK_PRESETS,quickPresetState};', ctx);
+vm.runInContext(source + '\nthis.api={referenceContactLength,referenceBraidAngle,turnsFromAngle,radiusAt,wireLength,solveCup,validateState,catalogMatch,CATALOG,DEFAULTS,solveContact,contactGeometry,contactLengths,wallSlope,readScenario,PRESETS,sweepRange,experimentResult,QUICK_PRESETS,quickPresetState,revolveProfile,sacMeridian,cupMeridian};', ctx);
 const {radiusAt,wireLength,solveCup,validateState,catalogMatch,CATALOG} = ctx.api;
 const DEFAULTS={...ctx.api.DEFAULTS,profile:'ellipse'};
 const near=(a,b,tol=1e-8)=>assert.ok(Math.abs(a-b)<tol, `${a} != ${b}`);
@@ -139,3 +139,21 @@ for(const size of [5,7,9,11,14]){
  near(ctx.api.turnsFromAngle(ctx.api.referenceBraidAngle(s),s.ratio,s.profile),s.turns);
 }
 console.log('Consistent contact reference: free-depth recovery, scale invariance and angle conversion passed.');
+
+// Solids of revolution: closed azimuth, triangle count, non-negative radii.
+{
+ const {revolveProfile,sacMeridian,cupMeridian,solveCup}=ctx.api;
+ const sac=sacMeridian(ctx.api.DEFAULTS,20);
+ assert.equal(sac.length,21);assert.ok(sac.every(p=>p.r>=0&&Number.isFinite(p.z)));
+ const nTheta=12;
+ const mesh=revolveProfile(sac,nTheta);
+ assert.equal(mesh.positions.length,sac.length*nTheta*3);
+ assert.equal(mesh.indices.length,(sac.length-1)*nTheta*6);
+ assert.equal(mesh.nTheta,nTheta);
+ for(let i=0;i<mesh.positions.length;i+=3)near(Math.hypot(mesh.positions[i],mesh.positions[i+1]),sac[Math.floor(i/3/nTheta)].r,1e-5);
+ const cup=solveCup(ctx.api.DEFAULTS,9);
+ const cupMesh=revolveProfile(cupMeridian(cup).map(p=>({...p,free:!p.contact})),16);
+ assert.ok(cupMesh.indices.length>0);
+ assert.throws(()=>revolveProfile([{r:1,z:0}],8));
+}
+console.log('Revolution meshes: sac/cup sampling, topology and radius recovery passed.');
