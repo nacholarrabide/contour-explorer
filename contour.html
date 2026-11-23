@@ -74,10 +74,10 @@
 <div class="views-row">
 <div class="view-pane"><div class="view-pane-label"><span>2D · longitudinal section</span><span class="small">Equal axis scale</span></div>
 <svg id="diagram" viewBox="0 0 600 540" role="img" aria-labelledby="diagramTitle diagramDesc"></svg></div>
-<div class="view-pane"><div class="view-pane-label"><span>3D · terminal bifurcation context</span><button type="button" id="reset3dView" title="Reset camera">Reset view</button></div>
+<div class="view-pane"><div class="view-pane-label"><span>3D · solids of revolution</span><button type="button" id="reset3dView" title="Reset camera">Reset view</button></div>
 <div id="diagram3dHost" role="img" aria-label="Three-dimensional solids of revolution of the sac and cup"></div></div>
 </div>
-<p class="small" style="padding:0 10px">Idealised outer profile. The proximal point is the geometric pole, not the marker. Amber: wall contact; circles: departure. Red: the entire undersized cup and its rim gaps, or segments outside the sac / below the neck plane. Horizontal dashed lines: rim-to-wall gaps. The 3D panel revolves the same meridional curves and adds a synthetic terminal bifurcation (parent trunk + two daughters) below the neck for context only — not a flow or vessel model. Drag to orbit, scroll to zoom. Synthetic model · uncalibrated.</p>
+<p class="small" style="padding:0 10px">Idealised outer profile. The proximal point is the geometric pole, not the marker. Amber: wall contact; circles: departure. Red: the entire undersized cup and its rim gaps, or segments outside the sac / below the neck plane. Horizontal dashed lines: rim-to-wall gaps. The 3D panel revolves the same meridional curves as the 2D section; drag to orbit, scroll to zoom. Synthetic model · uncalibrated.</p>
 </section>
 <aside class="panel results" aria-label="Results"><div><h2>Simulation results</h2><p class="small">Calculated outputs · read-only</p><div id="metrics"></div><div id="status" role="status" aria-live="polite"></div><div id="comparisonInfo" class="small"></div></div><div><h2 style="margin-top:20px">Published ranges</h2><p class="small">Sac width / neck width, in mm. Highlighted: both measurements within the published range.</p><div id="catalog" class="catalog"></div><p class="small">Matching catalogue ranges does not establish device fit.</p></div></aside></div>
 </div>
@@ -395,8 +395,8 @@ if(host){
 
  function themeColors(){
   return appearance==='stryker'
-   ?{bg:0xffffff,sac:0xd8dad7,sacOpacity:0.35,grid:0xe3e5e1,amb:0xf5f5f3,vessel:0xa2aaa8,vesselOpacity:0.55,orifice:0x806537}
-   :{bg:0x0f1a2e,sac:0x7f92b8,sacOpacity:0.28,grid:0x253249,amb:0x0b1220,vessel:0x536480,vesselOpacity:0.5,orifice:0xc7a87b};
+   ?{bg:0xffffff,sac:0xd8dad7,sacOpacity:0.35,grid:0xe3e5e1,amb:0xf5f5f3}
+   :{bg:0x0f1a2e,sac:0x7f92b8,sacOpacity:0.28,grid:0x253249,amb:0x0b1220};
  }
  function applyTheme(){
   const t=themeColors();
@@ -430,44 +430,14 @@ if(host){
 
  function clearRoot(){while(root.children.length){const o=root.children.pop();if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();}}
 
- function tubeMesh(points,radius,color,opacity){
-  const curve=new THREE.CatmullRomCurve3(points.map(([x,y,z])=>new THREE.Vector3(x,y,z)));
-  const geo=new THREE.TubeGeometry(curve,28,radius,18,false);
-  const mat=new THREE.MeshStandardMaterial({
-   color,roughness:0.62,metalness:0.04,transparent:true,opacity,side:THREE.DoubleSide,depthWrite:false
-  });
-  return new THREE.Mesh(geo,mat);
- }
-
- // Decorative terminal bifurcation under the neck (visual context only).
- function addTerminalBifurcation(group,bounds,t){
-  const neckR=Math.max(0.35,(bounds.neck||4)/2);
-  const daughterR=neckR*0.72;
-  const parentR=neckR*0.95;
-  const depth=Math.max(4.5,Math.max(bounds.width||6,bounds.height||6)*0.7);
-  const spread=Math.max(neckR*2.2,(bounds.width||6)*0.55);
-  const apexZ=0;
-  // Parent trunk from below; daughters stay fully horizontal in the neck plane (T junction).
-  group.add(tubeMesh([[0,0,-depth],[0,0,-depth*0.45],[0,0,apexZ]],parentR,t.vessel,t.vesselOpacity));
-  group.add(tubeMesh([[0,0,apexZ],[-spread*0.5,0,apexZ],[-spread,0,apexZ]],daughterR,t.vessel,t.vesselOpacity));
-  group.add(tubeMesh([[0,0,apexZ],[spread*0.5,0,apexZ],[spread,0,apexZ]],daughterR,t.vessel,t.vesselOpacity));
-  const orifice=new THREE.Mesh(
-   new THREE.TorusGeometry(neckR,Math.max(0.06,neckR*0.08),10,48),
-   new THREE.MeshStandardMaterial({color:t.orifice,roughness:0.45,metalness:0.1,transparent:true,opacity:0.85})
-  );
-  orifice.position.z=0;
-  group.add(orifice);
- }
-
  function fitCamera(bounds){
   const h=Math.max(2,bounds.height||6);
   const w=Math.max(2,bounds.width||6);
   const pole=Number.isFinite(bounds.pole)?bounds.pole:-1;
-  const vesselDepth=Math.max(4.5,Math.max(w,h)*0.7);
   const midZ=(pole+h)/2;
-  const radius=Math.max(w,h,vesselDepth)*0.9;
-  camera.position.set(radius*1.45,radius*1.15,midZ+h*0.05);
-  controls.target.set(0,0,Math.max(midZ-vesselDepth*0.15,pole));
+  const radius=Math.max(w,h)*0.85;
+  camera.position.set(radius*1.35,radius*1.05,midZ+h*0.15);
+  controls.target.set(0,0,midZ);
   controls.update();
   fitted=true;
  }
@@ -489,7 +459,6 @@ if(host){
   if(cup)root.add(cup);
   const cmp=meshFromRevolution(snap.compare,{nTheta:52,transparent:true,opacity:0.55,wireframe:true,tag:{compare:true}});
   if(cmp)root.add(cmp);
-  addTerminalBifurcation(root,snap.bounds||{},t);
   const neck=new THREE.GridHelper(Math.max(snap.bounds.width*1.6,6),8,t.grid,t.grid);
   neck.rotation.x=Math.PI/2;
   neck.position.z=0;
